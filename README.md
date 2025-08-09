@@ -1,3 +1,8 @@
 # Franka RealSense Camera Extrinsics (ROS Noetic)
 
 This is package provides functionality to manually generate extrinsics for a realsense camera. This is done by controlling the pose of the realsense camera in rviz, and comparing the pointcloud observed to the robots state provided by forward kinematics. The joint angles are published with the `panda_joint_state_publisher.py` script which reads the configuration from [deoxys](https://github.com/UT-Austin-RPL/deoxys_control).
+
+
+
+
+![Demo](media/demo.gif)

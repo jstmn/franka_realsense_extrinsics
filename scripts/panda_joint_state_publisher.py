@@ -1,6 +1,4 @@
 #!/home/jstm/Projects/mpcm2/deoxys_venv/bin/python3
-import sys
-print("Python interpreter:", sys.executable)
 import argparse
 import rospy
 from sensor_msgs.msg import JointState
@@ -11,10 +9,8 @@ from pathlib import Path
 
 class PandaJointStatePublisher:
     def __init__(self, interface_cfg_filepath: Path):
-        print(f"Initializing FrankaInterface with config file: {interface_cfg_filepath}")
         # Create FrankaInterface following deoxys example
         self.franka_interface = FrankaInterface(interface_cfg_filepath, use_visualizer=False)
-
         # Create joint state publishers
         self.joint_state_pub = rospy.Publisher('joint_states', JointState, queue_size=10)
 
@@ -25,6 +21,7 @@ class PandaJointStatePublisher:
             'panda_finger_joint1', 'panda_finger_joint2'
         ]
 
+        rospy.loginfo(f"Initializing FrankaInterface with config file: {interface_cfg_filepath}")
         self.rate = rospy.Rate(10)  # 10 Hz
 
     def run(self):
@@ -48,9 +45,7 @@ class PandaJointStatePublisher:
                 self.joint_state_pub.publish(js_msg)
 
                 if counter % 50 == 0:
-                    print("\n==================\n")
-                    print(js_msg)
-                    print("___")
+                    rospy.loginfo(f"Arm q: {arm_q}")
                 counter += 1
 
             except Exception as e:
@@ -64,11 +59,14 @@ def main():
     parser.add_argument("deoxys_interface_cfg_filepath", type=str)
     args, _ = parser.parse_known_args()
     rospy.init_node('panda_joint_state_publisher', anonymous=False)
-    interface_cfg_filepath = Path(args.deoxys_interface_cfg_filepath.split(":=")[1])
-    assert interface_cfg_filepath.exists(), f"Interface config file {interface_cfg_filepath} does not exist"
+    assert args.deoxys_interface_cfg_filepath is not None, "No config file path provided"
+    if ":=" in args.deoxys_interface_cfg_filepath:
+        args.deoxys_interface_cfg_filepath = args.deoxys_interface_cfg_filepath.split(":=")[1]
+    else:
+        interface_cfg_filepath = Path(args.deoxys_interface_cfg_filepath)
+    assert interface_cfg_filepath.exists(), f"The provided config file: '{interface_cfg_filepath}' does not exist. Provided args: {args}"
     publisher = PandaJointStatePublisher(interface_cfg_filepath)
     publisher.run()
 
 if __name__ == '__main__':
     main()
-    

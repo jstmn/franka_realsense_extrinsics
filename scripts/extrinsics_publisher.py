@@ -75,7 +75,7 @@ def make_6dof_marker(base_frame: str, child_frame: str, init_pose: Pose):
     rot_z.name = "rotate_z"
     rot_z.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
     rot_z.orientation.w, rot_z.orientation.x, rot_z.orientation.y, rot_z.orientation.z = tft.quaternion_from_euler(0, -1.57, 0)
-    
+
     # Set initial pose
     int_marker.controls += [control_x, control_y, control_z, rot_x, rot_y, rot_z]
     int_marker.pose = init_pose
@@ -92,7 +92,7 @@ class TFPublisher:
         self.tf_rate = rospy.Rate(50)
 
         # Set up interactive marker server
-        self.last_pose = Pose(orientation=Quaternion(x=-0.7360096573829651, y=-0.5973806381225586, z=0.10968942940235138, w=0.29898929595947266), position=Point(x=0.962416410446167, y=-0.30427485704421997, z=0.6821697950363159))
+        self.last_pose = Pose(orientation=Quaternion(x=-0.7441695332527161,  y=-0.5852000713348389,  z=0.10598380863666534,  w=0.30417126417160034), position=Point(x=0.9778818488121033, y=-0.3103826344013214,  z=0.6897751092910767))
         self.server = InteractiveMarkerServer("movable_realsense_frame_marker")
         marker = make_6dof_marker(self.robot_base_frame_id, self.camera_frame_id, self.last_pose)
         self.server.insert(marker, self.process_feedback)
@@ -117,12 +117,11 @@ class TFPublisher:
             # Fixed transform from robot base to camera (you can modify these values)
             # This is an example transform - replace with your actual calibration values
             tf.header.frame_id = self.robot_base_frame_id
+            # tf.header.frame_id = "base_link"
             tf.child_frame_id = self.camera_frame_id
-            # Translation (x, y, z) in meters
             tf.transform.translation.x = self.last_pose.position.x
             tf.transform.translation.y = self.last_pose.position.y
             tf.transform.translation.z = self.last_pose.position.z
-            # Rotation (quaternion) - identity rotation (no rotation)
             tf.transform.rotation.x = self.last_pose.orientation.x
             tf.transform.rotation.y = self.last_pose.orientation.y
             tf.transform.rotation.z = self.last_pose.orientation.z
@@ -130,6 +129,20 @@ class TFPublisher:
 
             # Publish the transform
             self.tf_broadcaster.sendTransform(tf)
+
+            # Publish base__T__panda_link0
+            tf_base = TransformStamped()
+            tf_base.header.stamp = rospy.Time.now()
+            tf_base.header.frame_id = self.robot_base_frame_id
+            tf_base.child_frame_id = "base_link"
+            tf_base.transform.translation.x = 0.0
+            tf_base.transform.translation.y = 0.0
+            tf_base.transform.translation.z = 0.0
+            tf_base.transform.rotation.x = 0.0
+            tf_base.transform.rotation.y = 0.0
+            tf_base.transform.rotation.z = 0.0
+            tf_base.transform.rotation.w = 1.0
+            self.tf_broadcaster.sendTransform(tf_base)
             self.tf_rate.sleep()
 
 

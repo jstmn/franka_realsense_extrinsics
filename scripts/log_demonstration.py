@@ -10,7 +10,7 @@ import h5py
 from datetime import datetime
 import os
 import json
-
+import cv2
 
 # $ rostopic list
 # ...
@@ -53,7 +53,7 @@ def to_public_dict(obj):
 
 
 class DemonstrationLogger:
-    def __init__(self, parent_output_dir: Path, description: str, rate: int = 30):
+    def __init__(self, parent_output_dir: Path, description: str, rate: int = 15):
         self._description = description
         self._tstart = datetime.now().strftime("%m-%d_%H:%M:%S")
         assert parent_output_dir.exists(), f"The provided parent output directory: '{parent_output_dir}' does not exist"
@@ -85,11 +85,9 @@ class DemonstrationLogger:
 
     def depth_callback(self, msg: Image):
         self._depth_image = msg
-        self._depth_image_msgs.append(msg)
 
     def color_callback(self, msg: Image):
         self._color_image = msg
-        self._color_image_msgs.append(msg)
 
     def extrinsics_callback(self, msg: Extrinsics):
         self._extrinsics = msg
@@ -102,21 +100,42 @@ class DemonstrationLogger:
 
     def joint_states_callback(self, msg: JointState):
         self._joint_states = msg
-        self._joint_states_msgs.append(msg)
 
     def save_data(self):
+        if len(self._depth_image_msgs) == 0:
+            rospy.logwarn("Skipping data saving because no data was received")
+            return
+
         h5_filepath = os.path.join(self._output_dir, f"data.h5")
         with h5py.File(h5_filepath, "w") as f:
             depth_images = np.array([np.frombuffer(msg.data, dtype=np.uint16).reshape(msg.height, msg.width) for msg in self._depth_image_msgs])
             color_images = np.array([np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1) for msg in self._color_image_msgs])
+            q = np.array([msg.position for msg in self._joint_states_msgs])
+            dq = np.array([msg.velocity for msg in self._joint_states_msgs])
+            print("\n==============================")
+            print("Data shapes:")
+            print(f"  depth_images: {depth_images.shape}")
+            print(f"  color_images: {color_images.shape}")
+            print(f"  q:            {q.shape}")
+            print(f"  dq:           {dq.shape}")
+            print()
+            assert depth_images.shape[0] == color_images.shape[0] == q.shape[0] == dq.shape[0]
             f.create_dataset("depth_image", data=depth_images)
             f.create_dataset("color_image", data=color_images)
-            f.create_dataset("joint_states_q", data=np.array([msg.position for msg in self._joint_states_msgs]))
-            f.create_dataset("joint_states_dq", data=np.array([msg.velocity for msg in self._joint_states_msgs]))
+            f.create_dataset("joint_states_q", data=q)
+            f.create_dataset("joint_states_dq", data=dq)
+
 
         for name, msg in [("camera_info_depth", self._depth_camera_info), ("camera_info_color", self._color_camera_info), ("camera_internal_extrinsics", self._extrinsics)]:
             with open(os.path.join(self._output_dir, f"{name}.json"), "w") as f:
                 json.dump(to_public_dict(msg), f)
+
+        # Save some images for debugging
+        img_dir = os.path.join(self._output_dir, "images")
+        os.makedirs(img_dir, exist_ok=True)
+        for i in range(depth_images.shape[0]):
+            cv2.imwrite(os.path.join(img_dir, f"depth_{i}.png"), depth_images[i])
+            cv2.imwrite(os.path.join(img_dir, f"color_{i}.png"), color_images[i])
 
         rospy.loginfo(f"Data saved to {h5_filepath}")
 
@@ -125,6 +144,7 @@ class DemonstrationLogger:
         empty_counter = 0
         while not rospy.is_shutdown():
             self.rate.sleep()
+            assert len(self._depth_image_msgs) == len(self._color_image_msgs) == len(self._joint_states_msgs), f""
 
             if any(msg is None for msg in [self._depth_image, self._color_image, self._depth_camera_info, self._color_camera_info, self._joint_states]):
                 empty_counter += 1

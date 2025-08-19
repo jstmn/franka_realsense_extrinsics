@@ -92,7 +92,19 @@ class TFPublisher:
         self.tf_rate = rospy.Rate(50)
 
         # Set up interactive marker server
-        self.last_pose = Pose(orientation=Quaternion(x=-0.7441695332527161,  y=-0.5852000713348389,  z=0.10598380863666534,  w=0.30417126417160034), position=Point(x=0.9778818488121033, y=-0.3103826344013214,  z=0.6897751092910767))
+        self.last_pose = Pose(
+            orientation=Quaternion(
+                x=-0.920545756816864,
+                y=0.10400136560201645,
+                z=0.35922613739967346,
+                w=0.11285384744405746
+            ),
+            position=Point(
+                x=1.0120489597320557,
+                y=-0.3012675344944,
+                z=0.7536279559135437
+            )
+        )
         self.server = InteractiveMarkerServer("movable_realsense_frame_marker")
         marker = make_6dof_marker(self.robot_base_frame_id, self.camera_frame_id, self.last_pose)
         self.server.insert(marker, self.process_feedback)
@@ -104,7 +116,22 @@ class TFPublisher:
         pose_msg.header = feedback.header
         pose_msg.pose = feedback.pose
         self.last_pose = pose_msg.pose
-        print("process_feedback:", self.last_pose)
+        print()
+        print(self.last_pose)
+        # Convert the current pose to a 4x4 transformation matrix and print it
+        # moved to top-level imports
+
+        pos = self.last_pose.position
+        ori = self.last_pose.orientation
+        # Quaternion as [x, y, z, w]
+        quat = [ori.x, ori.y, ori.z, ori.w]
+        # 4x4 from quaternion and translation
+        T = tft.quaternion_matrix(quat)
+        T[0, 3] = pos.x
+        T[1, 3] = pos.y
+        T[2, 3] = pos.z
+        np.set_printoptions(precision=4, suppress=True)
+        print(T)
 
 
     def run(self):

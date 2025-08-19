@@ -7,12 +7,14 @@ import numpy as np
 from pathlib import Path
 
 
+np.set_printoptions(precision=4, suppress=True, linewidth=200)
+
 class PandaJointStatePublisher:
     def __init__(self, interface_cfg_filepath: Path):
         # Create FrankaInterface following deoxys example
         self.franka_interface = FrankaInterface(interface_cfg_filepath, use_visualizer=False)
         # Create joint state publishers
-        self.joint_state_pub = rospy.Publisher('joint_states', JointState, queue_size=10)
+        self.joint_state_pub = rospy.Publisher('/panda/joint_states', JointState, queue_size=10)
 
         # Define joint names
         self.joint_names = [

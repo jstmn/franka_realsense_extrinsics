@@ -212,5 +212,7 @@ install(FILES
 
 catkin_install_python(PROGRAMS
   scripts/panda_joint_state_publisher.py
+  scripts/extrinsics_publisher.py
+  scripts/log_demonstration.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

@@ -1,5 +1,6 @@
 #!/home/jstm/Projects/mpcm2/deoxys_venv/bin/python3
 import argparse
+from re import M
 import rospy
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
@@ -81,11 +82,41 @@ def make_6dof_marker(base_frame: str, child_frame: str, init_pose: Pose):
     int_marker.pose = init_pose
     return int_marker
 
+def _transformation_matrix_to_pose(transformation_matrix: np.ndarray) -> Pose:
+    # From quaternion_from_matrix returns a quaternion as[x, y, z, w].
+    q = tft.quaternion_from_matrix(transformation_matrix)
+    return Pose(
+        orientation=Quaternion(
+            x=q[0],
+            y=q[1],
+            z=q[2],
+            w=q[3]
+        ),
+        position=Point(
+            x=transformation_matrix[0, 3],
+            y=transformation_matrix[1, 3],
+            z=transformation_matrix[2, 3]
+        )
+    )
 
-class TFPublisher:
+# South camera
+# [
+#     [-0.9586, 0.1542, -0.2395, 0.7091],
+#     [0.2834, 0.6019, -0.7466, 0.612],
+#     [0.0291, -0.7835, -0.6207, 0.446],
+#     [0.0, 0.0, 0.0, 1.0],
+# ]
+
+
+class ExtrinsicsTfPublisher:
     def __init__(self):
         self.camera_frame_id = "camera_depth_optical_frame"
         self.robot_base_frame_id = "panda_link0"
+
+        TODO: Update so that the tf gui updates base_link instead of camera_depth_optical_frame. 
+        panda_link0 and  camera_depth_optical_frame shouldn't be set directly. base_link should be the one to move 
+        around. Next, print out the transform from panda_link0 to camera_depth_optical_frame for use in Mpcm2.
+
 
         # Set up TF broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -116,8 +147,6 @@ class TFPublisher:
         pose_msg.header = feedback.header
         pose_msg.pose = feedback.pose
         self.last_pose = pose_msg.pose
-        print()
-        print(self.last_pose)
         # Convert the current pose to a 4x4 transformation matrix and print it
         # moved to top-level imports
 
@@ -131,7 +160,12 @@ class TFPublisher:
         T[1, 3] = pos.y
         T[2, 3] = pos.z
         np.set_printoptions(precision=4, suppress=True)
-        print(T)
+
+        # Print the transform
+        rospy.loginfo(f"")
+        rospy.loginfo(f"\n{self.robot_base_frame_id}__T__{self.camera_frame_id}:")
+        rospy.loginfo(f"Pose: {self.last_pose}")
+        rospy.loginfo(f"Transform matrix:\n{T}")
 
 
     def run(self):
@@ -158,28 +192,26 @@ class TFPublisher:
             self.tf_broadcaster.sendTransform(tf)
 
             # Publish base__T__panda_link0
-            tf_base = TransformStamped()
-            tf_base.header.stamp = rospy.Time.now()
-            tf_base.header.frame_id = self.robot_base_frame_id
-            tf_base.child_frame_id = "base_link"
-            tf_base.transform.translation.x = 0.0
-            tf_base.transform.translation.y = 0.0
-            tf_base.transform.translation.z = 0.0
-            tf_base.transform.rotation.x = 0.0
-            tf_base.transform.rotation.y = 0.0
-            tf_base.transform.rotation.z = 0.0
-            tf_base.transform.rotation.w = 1.0
-            self.tf_broadcaster.sendTransform(tf_base)
+            # tf_base = TransformStamped()
+            # tf_base.header.stamp = rospy.Time.now()
+            # tf_base.header.frame_id = self.robot_base_frame_id
+            # tf_base.child_frame_id = "base_link"
+            # tf_base.transform.translation = tf.transform.translation
+            # tf_base.transform.rotation.x = 0.0
+            # tf_base.transform.rotation.y = 0.0
+            # tf_base.transform.rotation.z = 0.0
+            # tf_base.transform.rotation.w = 1.0
+            # self.tf_broadcaster.sendTransform(tf_base)
+
+            # 
             self.tf_rate.sleep()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Publish fixed transform between camera and robot base")
     args, _ = parser.parse_known_args()
-    
     rospy.init_node('camera_robot_tf_publisher', anonymous=False)
-    
-    publisher = TFPublisher()
+    publisher = ExtrinsicsTfPublisher()
     publisher.run()
 
 if __name__ == '__main__':

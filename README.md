@@ -5,4 +5,4 @@ This is package provides functionality to manually generate extrinsics for a rea
 
 
 
-![Demo](media/demo.gif)
+![Demo](media/hero-gif.gif)

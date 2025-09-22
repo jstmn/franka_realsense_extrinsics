@@ -102,44 +102,28 @@ def _transformation_matrix_to_pose(transformation_matrix: np.ndarray) -> Pose:
     )
 
 
-# south camera known correct 'panda__link0 -> camera_depth_optical_frame'
-# Pose(
-#     orientation=Quaternion(
-#         x=-0.920545756816864,
-#         y=0.10400136560201645,
-#         z=0.35922613739967346,
-#         w=0.11285384744405746
-#     ),
-#     position=Point(
-#         x=1.0120489597320557,
-#         y=-0.3012675344944,
-#         z=0.7536279559135437
-#     )
-# )
-# In matrix form:
-# [[ 0.7203 -0.2726 -0.6379  1.012 ]
-#  [-0.1104 -0.9529  0.2825 -0.3013]
-#  [-0.6848 -0.1331 -0.7164  0.7536]
-#  [ 0.      0.      0.      1.    ]]
-# PANDA_LINK0__T__OPTICAL_SEED__SOUTH_CAMERA = np.array([
-#     [0.7203, -0.2726, -0.6379, 1.0120],
-#     [-0.1104, -0.9529,  0.2825, -0.3013],
-#     [-0.6848, -0.1331, -0.7164, 0.7536],
-#     [0.0,     0.0,      0.0,    1.0]
-# ])
-
-# camera_base_T_optical (this is fixed and provided by realsense_ros):
-# [[ 0.      0.      1.      0.0106]
-#  [-1.     -0.      0.      0.0175]
-#  [ 0.     -1.      0.      0.0125]
-#  [ 0.      0.      0.      1.    ]]
-
+# panda_link0__T__${camera_name}_base_link
+EXTRINSICS_MATRICES = {
+    "south": np.array([
+        [-0.6379, -0.7203,  0.2726,  1.0278],
+        [ 0.2826,  0.1104,  0.9529, -0.3099],
+        [-0.7164,  0.6849,  0.1331,  0.7441],
+        [ 0.0,     0.0,     0.0,     1.0]
+    ]),
+    "north": np.array([
+        [-0.42493587,  0.88923595,  0.1693781,   0.91113114],
+        [-0.39242785, -0.01234728, -0.91969991,  0.47425413],
+        [-0.81573886, -0.45728216,  0.35420775,  0.79308677],
+        [ 0.0,         0.0,         0.0,         1.0]
+    ]),
+}
 
 
 class ExtrinsicsTfPublisher:
-    def __init__(self):
-        self._camera_base_frame_id = "base_link"
-        self._camera_optical_frame_id = "camera_depth_optical_frame"
+    def __init__(self, camera_tf_prefix: str):
+        self._camera_name = camera_tf_prefix
+        self._camera_base_frame_id = f"{camera_tf_prefix}_base_link"
+        self._camera_optical_frame_id = f"{camera_tf_prefix}_depth_optical_frame"
         self._robot_base_frame_id = "panda_link0"
 
         # TODO: Update so that the tf gui updates base_link instead of camera_depth_optical_frame. 
@@ -157,13 +141,15 @@ class ExtrinsicsTfPublisher:
         assert self._camera_base__T__optical is not None
 
         # Set up interactive marker server
-        self._last_world__T__base_link = _transformation_matrix_to_pose(np.array([
-            [-0.6379, -0.7203,  0.2726,  1.0278],
-            [ 0.2826,  0.1104,  0.9529, -0.3099],
-            [-0.7164,  0.6849,  0.1331,  0.7441],
-            [ 0.0,     0.0,     0.0,     1.0]
-        ]))
-        self.server = InteractiveMarkerServer("movable_realsense_frame_marker")
+        if "south" in self._camera_name:
+            tf_seed = EXTRINSICS_MATRICES["south"]
+        elif "north" in self._camera_name:
+            tf_seed = EXTRINSICS_MATRICES["north"]
+        else:
+            raise ValueError(f"Unknown camera name: {self._camera_name} (should include 'south' or 'north')")
+
+        self._last_world__T__base_link = _transformation_matrix_to_pose(tf_seed)
+        self.server = InteractiveMarkerServer(f"{self._camera_name}__extrinsics_adjuster")
         marker = make_6dof_marker(self._robot_base_frame_id, self._camera_base_frame_id, self._last_world__T__base_link)
         self.server.insert(marker, self.process_feedback)
         self.server.applyChanges()
@@ -211,11 +197,9 @@ class ExtrinsicsTfPublisher:
         world__T__camera_optical = world__T__base_link @ self._camera_base__T__optical
 
         # Print the transforms
-        rospy.loginfo("_________________________")
-        for T, name in zip([world__T__base_link, world__T__camera_optical, self._camera_base__T__optical], ["world_T_base_link", "world_T_camera_optical", "camera_base_T_optical"]):
-            rospy.loginfo(f"\n{name}:")
-            rospy.loginfo(f"Pose:             {_transformation_matrix_to_pose(T)}")
-            rospy.loginfo(f"Transform matrix: {T}")
+        rospy.loginfo("\n___________________________________________________________________________\n")
+        for T, name in zip([world__T__base_link, world__T__camera_optical, self._camera_base__T__optical], [f"world__T__{self._camera_name}_base_link", f"world__T__{self._camera_name}_camera_optical", f"camera_base__T__{self._camera_name}_optical"]):
+            rospy.loginfo(f"{name}\n  --> Pose: {_transformation_matrix_to_pose(T)}\n  --> T:    {T}")
 
     def run(self):
         rospy.loginfo(f"Publishing transform from {self._robot_base_frame_id} to {self._camera_base_frame_id}")
@@ -234,28 +218,20 @@ class ExtrinsicsTfPublisher:
             tf.transform.rotation.z = self._last_world__T__base_link.orientation.z
             tf.transform.rotation.w = self._last_world__T__base_link.orientation.w
             self.tf_broadcaster.sendTransform(tf)
-
-            # Publish base__T__panda_link0
-            # tf_base = TransformStamped()
-            # tf_base.header.stamp = rospy.Time.now()
-            # tf_base.header.frame_id = self.robot_base_frame_id
-            # tf_base.child_frame_id = "base_link"
-            # tf_base.transform.translation = tf.transform.translation
-            # tf_base.transform.rotation.x = 0.0
-            # tf_base.transform.rotation.y = 0.0
-            # tf_base.transform.rotation.z = 0.0
-            # tf_base.transform.rotation.w = 1.0
-            # self.tf_broadcaster.sendTransform(tf_base)
-
-            # 
             self.tf_rate.sleep()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Publish fixed transform between camera and robot base")
-    args, _ = parser.parse_known_args()
+    parser.add_argument('--camera_tf_prefix', type=str, default='camera', help='Camera name (e.g., camera_south, camera_north)')
+    args, unknown = parser.parse_known_args()
+    print(f"Unknown arguments: {unknown}", flush=True)
+    assert args.camera_tf_prefix is not None
+    assert "south" in args.camera_tf_prefix or "north" in args.camera_tf_prefix, f"Camera tf prefix must contain 'south' or 'north': {args.camera_tf_prefix}. Unknown arguments: {unknown}"
+
+    # Initialize node (namespace is handled by launch file's <group ns="...">)
     rospy.init_node('camera_robot_tf_publisher', anonymous=False)
-    publisher = ExtrinsicsTfPublisher()
+    publisher = ExtrinsicsTfPublisher(args.camera_tf_prefix)
     publisher.run()
 
 if __name__ == '__main__':

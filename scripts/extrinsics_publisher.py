@@ -1,5 +1,6 @@
 #!/home/jstm/Projects/mpcm2/deoxys_venv/bin/python3
 import argparse
+from re import M
 import rospy
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
@@ -10,6 +11,8 @@ from interactive_markers.interactive_marker_server import InteractiveMarkerServe
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
 import tf.transformations as tft
 from geometry_msgs.msg import PoseStamped, Pose, Quaternion, Point
+
+np.set_printoptions(precision=4, suppress=True)
 
 def make_6dof_marker(base_frame: str, child_frame: str, init_pose: Pose):
     int_marker = InteractiveMarker()
@@ -81,107 +84,155 @@ def make_6dof_marker(base_frame: str, child_frame: str, init_pose: Pose):
     int_marker.pose = init_pose
     return int_marker
 
+def _transformation_matrix_to_pose(transformation_matrix: np.ndarray) -> Pose:
+    # From quaternion_from_matrix returns a quaternion as[x, y, z, w].
+    q = tft.quaternion_from_matrix(transformation_matrix)
+    return Pose(
+        orientation=Quaternion(
+            x=q[0],
+            y=q[1],
+            z=q[2],
+            w=q[3]
+        ),
+        position=Point(
+            x=transformation_matrix[0, 3],
+            y=transformation_matrix[1, 3],
+            z=transformation_matrix[2, 3]
+        )
+    )
 
-class TFPublisher:
-    def __init__(self):
-        self.camera_frame_id = "camera_depth_optical_frame"
-        self.robot_base_frame_id = "panda_link0"
+
+# panda_link0__T__${camera_name}_base_link
+EXTRINSICS_MATRICES = {
+    "camera_south": np.array([
+        [-0.6379, -0.7203,  0.2726,  1.0278],
+        [ 0.2826,  0.1104,  0.9529, -0.3099],
+        [-0.7164,  0.6849,  0.1331,  0.7441],
+        [ 0.0,     0.0,     0.0,     1.0]
+    ]),
+    "camera_north": np.array([
+        [-0.4504,  0.8766,  0.1694,  0.887],
+        [-0.3919, -0.0236, -0.9197,  0.4744],
+        [-0.8022, -0.4806,  0.3542,  0.805],
+        [ 0.0,     0.0,     0.0,     1.0]
+    ]),
+    "camera_eih": np.array([
+        [ 1.0,     0.0,     0.0,     0.5],
+        [ 0.0,     1.0,     0.0,     0.0],
+        [ 0.0,     0.0,     1.0,     0.5],
+        [ 0.0,     0.0,     0.0,     1.0]
+    ]),
+}
+
+
+class ExtrinsicsTfPublisher:
+    def __init__(self, camera_tf_prefix: str):
+        self._camera_name = camera_tf_prefix
+        self._camera_base_frame_id = f"{camera_tf_prefix}_base_link"
+        self._camera_optical_frame_id = f"{camera_tf_prefix}_depth_optical_frame"
+        self._robot_base_frame_id = "panda_link0"
+
+        # TODO: Update so that the tf gui updates base_link instead of camera_depth_optical_frame. 
+        # panda_link0 and  camera_depth_optical_frame shouldn't be set directly. base_link should be the one to move 
+        # around. Next, print out the transform from panda_link0 to camera_depth_optical_frame for use in Mpcm2.
 
         # Set up TF broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self.tf_rate = rospy.Rate(50)
 
+        # Set up TF listener
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        self._camera_base__T__optical = self.get_camera_base__T__optical()
+        assert self._camera_base__T__optical is not None
+
         # Set up interactive marker server
-        self.last_pose = Pose(
-            orientation=Quaternion(
-                x=-0.920545756816864,
-                y=0.10400136560201645,
-                z=0.35922613739967346,
-                w=0.11285384744405746
-            ),
-            position=Point(
-                x=1.0120489597320557,
-                y=-0.3012675344944,
-                z=0.7536279559135437
-            )
-        )
-        self.server = InteractiveMarkerServer("movable_realsense_frame_marker")
-        marker = make_6dof_marker(self.robot_base_frame_id, self.camera_frame_id, self.last_pose)
+        tf_seed = EXTRINSICS_MATRICES[self._camera_name]
+        self._last_world__T__base_link = _transformation_matrix_to_pose(tf_seed)
+        self.server = InteractiveMarkerServer(f"{self._camera_name}__extrinsics_adjuster")
+        marker = make_6dof_marker(self._robot_base_frame_id, self._camera_base_frame_id, self._last_world__T__base_link)
         self.server.insert(marker, self.process_feedback)
         self.server.applyChanges()
+
+
+
+    def get_camera_base__T__optical(self):
+        """Get the transform from camera base frame to camera optical frame as a 4x4 matrix"""
+        try:
+            # Look up the transform from camera base to camera optical frame
+            transform = self.tf_buffer.lookup_transform(
+                self._camera_base_frame_id, 
+                self._camera_optical_frame_id, 
+                rospy.Time(0), 
+                rospy.Duration(1.0)
+            )
+            # Convert TransformStamped to 4x4 matrix
+            translation = transform.transform.translation
+            rotation = transform.transform.rotation
+            rotation_matrix = tft.quaternion_matrix([rotation.x, rotation.y, rotation.z, rotation.w])
+            rotation_matrix[0, 3] = translation.x
+            rotation_matrix[1, 3] = translation.y
+            rotation_matrix[2, 3] = translation.z
+            return rotation_matrix
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn(f"Could not get transform from {self._camera_base_frame_id} to {self._camera_optical_frame_id}: {e}")
+            return None
 
 
     def process_feedback(self, feedback):
         pose_msg = PoseStamped()
         pose_msg.header = feedback.header
         pose_msg.pose = feedback.pose
-        self.last_pose = pose_msg.pose
-        print()
-        print(self.last_pose)
-        # Convert the current pose to a 4x4 transformation matrix and print it
-        # moved to top-level imports
+        self._last_world__T__base_link = pose_msg.pose
 
-        pos = self.last_pose.position
-        ori = self.last_pose.orientation
+        pos = self._last_world__T__base_link.position
+        ori = self._last_world__T__base_link.orientation
         # Quaternion as [x, y, z, w]
         quat = [ori.x, ori.y, ori.z, ori.w]
         # 4x4 from quaternion and translation
-        T = tft.quaternion_matrix(quat)
-        T[0, 3] = pos.x
-        T[1, 3] = pos.y
-        T[2, 3] = pos.z
-        np.set_printoptions(precision=4, suppress=True)
-        print(T)
+        world__T__base_link = tft.quaternion_matrix(quat)
+        world__T__base_link[0, 3] = pos.x
+        world__T__base_link[1, 3] = pos.y
+        world__T__base_link[2, 3] = pos.z
+        world__T__camera_optical = world__T__base_link @ self._camera_base__T__optical
 
+        # Print the transforms
+        rospy.loginfo("\n___________________________________________________________________________\n")
+        for T, name in zip([world__T__base_link, world__T__camera_optical, self._camera_base__T__optical], [f"world__T__{self._camera_name}_base_link", f"world__T__{self._camera_name}_camera_optical", f"camera_base__T__{self._camera_name}_optical"]):
+            rospy.loginfo(f"{name}\n  --> Pose: {_transformation_matrix_to_pose(T)}\n  --> T:    {T}")
 
     def run(self):
-        rospy.loginfo(f"Publishing transform from {self.robot_base_frame_id} to {self.camera_frame_id}")
+        rospy.loginfo(f"Publishing transform from {self._robot_base_frame_id} to {self._camera_base_frame_id}")
 
         while not rospy.is_shutdown():
             # Update timestamp
             tf = TransformStamped()
             tf.header.stamp = rospy.Time.now()
-            # Fixed transform from robot base to camera (you can modify these values)
-            # This is an example transform - replace with your actual calibration values
-            tf.header.frame_id = self.robot_base_frame_id
-            # tf.header.frame_id = "base_link"
-            tf.child_frame_id = self.camera_frame_id
-            tf.transform.translation.x = self.last_pose.position.x
-            tf.transform.translation.y = self.last_pose.position.y
-            tf.transform.translation.z = self.last_pose.position.z
-            tf.transform.rotation.x = self.last_pose.orientation.x
-            tf.transform.rotation.y = self.last_pose.orientation.y
-            tf.transform.rotation.z = self.last_pose.orientation.z
-            tf.transform.rotation.w = self.last_pose.orientation.w
-
-            # Publish the transform
+            tf.header.frame_id = self._robot_base_frame_id
+            tf.child_frame_id = self._camera_base_frame_id
+            tf.transform.translation.x = self._last_world__T__base_link.position.x
+            tf.transform.translation.y = self._last_world__T__base_link.position.y
+            tf.transform.translation.z = self._last_world__T__base_link.position.z
+            tf.transform.rotation.x = self._last_world__T__base_link.orientation.x
+            tf.transform.rotation.y = self._last_world__T__base_link.orientation.y
+            tf.transform.rotation.z = self._last_world__T__base_link.orientation.z
+            tf.transform.rotation.w = self._last_world__T__base_link.orientation.w
             self.tf_broadcaster.sendTransform(tf)
-
-            # Publish base__T__panda_link0
-            tf_base = TransformStamped()
-            tf_base.header.stamp = rospy.Time.now()
-            tf_base.header.frame_id = self.robot_base_frame_id
-            tf_base.child_frame_id = "base_link"
-            tf_base.transform.translation.x = 0.0
-            tf_base.transform.translation.y = 0.0
-            tf_base.transform.translation.z = 0.0
-            tf_base.transform.rotation.x = 0.0
-            tf_base.transform.rotation.y = 0.0
-            tf_base.transform.rotation.z = 0.0
-            tf_base.transform.rotation.w = 1.0
-            self.tf_broadcaster.sendTransform(tf_base)
             self.tf_rate.sleep()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Publish fixed transform between camera and robot base")
-    args, _ = parser.parse_known_args()
-    
+    parser.add_argument('--camera_tf_prefix', type=str, default='camera', help='Camera name (e.g., camera_south, camera_north)')
+    args, unknown = parser.parse_known_args()
+    print(f"Unknown arguments: {unknown}", flush=True)
+    assert args.camera_tf_prefix is not None
+    assert any(x in args.camera_tf_prefix for x in ["south", "north", "eih"]), f"Camera tf prefix must contain 'south' or 'north' or 'eih': {args.camera_tf_prefix}. Unknown arguments: {unknown}"
+
+    # Initialize node (namespace is handled by launch file's <group ns="...">)
     rospy.init_node('camera_robot_tf_publisher', anonymous=False)
-    
-    publisher = TFPublisher()
+    publisher = ExtrinsicsTfPublisher(args.camera_tf_prefix)
     publisher.run()
 
 if __name__ == '__main__':
     main()
-    

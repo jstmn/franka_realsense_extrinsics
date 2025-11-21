@@ -10,12 +10,11 @@
       <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
     </group>
 
-
-    <!-- RealSense -->
-    <group ns="realsense">
-        <arg name="serial_no"             default=""/>
+    <!-- RealSense South -->
+    <group ns="realsense_south">
+        <arg name="serial_no"             default="207222071967"/>
         <arg name="json_file_path"        default=""/>
-        <arg name="camera"                default="camera"/>
+        <arg name="camera"                default="camera_south"/>
 
         <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
         <arg name="serial_no"         value="$(arg serial_no)"/>
@@ -41,14 +40,83 @@
         </include>
 
         <!-- RealSense robot description -->
-        <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=true"/>
-        <node name="realsense_robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+        <param name="robot_description" command="$(find xacro)/xacro '$(find franka_realsense_extrinsics)/urdf/d435.urdf.xacro' use_nominal_extrinsics:=true camera_name:=$(arg camera)"/>
+        <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+        <node name="extrinsics_publisher" pkg="franka_realsense_extrinsics" type="extrinsics_publisher.py" args="--camera_tf_prefix $(arg camera)" output="screen"/>
     </group>
 
-    <node name="extrinsics_publisher" pkg="franka_extrinsics" type="extrinsics_publisher.py" />
+    
+    <!-- RealSense North -->
+    <group ns="realsense_north">
+        <arg name="serial_no"             default="841512071544"/>
+        <arg name="json_file_path"        default=""/>
+        <arg name="camera"                default="camera_north"/>
+
+        <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
+        <arg name="serial_no"         value="$(arg serial_no)"/>
+        <arg name="json_file_path"    value="$(arg json_file_path)"/>
+        <arg name="depth_width"       value="$(arg depth_width)"/>
+        <arg name="depth_height"      value="$(arg depth_height)"/>
+        <arg name="depth_fps"         value="$(arg depth_fps)"/>
+        <arg name="color_width"       value="$(arg color_width)"/>
+        <arg name="color_height"      value="$(arg color_height)"/>
+        <arg name="color_fps"         value="$(arg color_fps)"/>
+        <arg name="enable_depth"      value="true"/>
+        <arg name="enable_color"      value="true"/>
+        <arg name="enable_infra1"     value="false"/>
+        <arg name="enable_infra2"     value="false"/>
+        <arg name="enable_fisheye"    value="false"/>
+        <arg name="enable_gyro"       value="false"/>
+        <arg name="enable_accel"      value="false"/>
+        <arg name="enable_pointcloud" value="true"/>
+        <arg name="enable_sync"       value="true"/>
+        <arg name="tf_prefix"         value="$(arg camera)"/>
+        <arg name="clip_distance"     value="$(arg clip_distance)"/>
+        <arg name="filters" value="$(arg filters)"/>
+        </include>
+
+        <!-- RealSense robot description -->
+        <param name="robot_description" command="$(find xacro)/xacro '$(find franka_realsense_extrinsics)/urdf/d435.urdf.xacro' use_nominal_extrinsics:=true camera_name:=$(arg camera)"/>
+        <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+        <node name="extrinsics_publisher" pkg="franka_realsense_extrinsics" type="extrinsics_publisher.py" args="--camera_tf_prefix $(arg camera)" output="screen"/>
+    </group>
+
+    <!-- RealSense EyeInHand -->
+    <group ns="realsense_eih">
+        <arg name="serial_no"             default="130322270512"/>
+        <arg name="json_file_path"        default=""/>
+        <arg name="camera"                default="camera_eih"/>
+
+        <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
+        <arg name="serial_no"         value="$(arg serial_no)"/>
+        <arg name="json_file_path"    value="$(arg json_file_path)"/>
+        <arg name="depth_width"       value="$(arg depth_width)"/>
+        <arg name="depth_height"      value="$(arg depth_height)"/>
+        <arg name="depth_fps"         value="$(arg depth_fps)"/>
+        <arg name="color_width"       value="$(arg color_width)"/>
+        <arg name="color_height"      value="$(arg color_height)"/>
+        <arg name="color_fps"         value="$(arg color_fps)"/>
+        <arg name="enable_depth"      value="true"/>
+        <arg name="enable_color"      value="true"/>
+        <arg name="enable_infra1"     value="false"/>
+        <arg name="enable_infra2"     value="false"/>
+        <arg name="enable_fisheye"    value="false"/>
+        <arg name="enable_gyro"       value="false"/>
+        <arg name="enable_accel"      value="false"/>
+        <arg name="enable_pointcloud" value="true"/>
+        <arg name="enable_sync"       value="true"/>
+        <arg name="tf_prefix"         value="$(arg camera)"/>
+        <arg name="clip_distance"     value="$(arg clip_distance)"/>
+        <arg name="filters" value="$(arg filters)"/>
+        </include>
+
+        <!-- RealSense robot description -->
+        <param name="robot_description" command="$(find xacro)/xacro '$(find franka_realsense_extrinsics)/urdf/d405.urdf.xacro' use_nominal_extrinsics:=true camera_name:=$(arg camera)"/>
+        <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+        <node name="extrinsics_publisher" pkg="franka_realsense_extrinsics" type="extrinsics_publisher.py" args="--camera_tf_prefix $(arg camera)" output="screen"/>
+    </group>
 
 
-    <node pkg="rviz" type="rviz" output="screen" name="rviz" args="-d $(find franka_extrinsics)/rviz/main.rviz"/>
-
-
+    <!-- RVIZ -->
+    <node pkg="rviz" type="rviz" output="screen" name="rviz" args="-d $(find franka_realsense_extrinsics)/rviz/main.rviz"/>
 </launch>

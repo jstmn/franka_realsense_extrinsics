@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(franka_extrinsics)
+project(franka_realsense_extrinsics)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -103,7 +103,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES franka_extrinsics
+#  LIBRARIES franka_realsense_extrinsics
 #  CATKIN_DEPENDS rospy std_msgs
 #  DEPENDS system_lib
 )
@@ -121,7 +121,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/franka_extrinsics.cpp
+#   src/${PROJECT_NAME}/franka_realsense_extrinsics.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -211,8 +211,6 @@ install(FILES
 )
 
 catkin_install_python(PROGRAMS
-  scripts/panda_joint_state_publisher.py
   scripts/extrinsics_publisher.py
-  scripts/log_demonstration.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

@@ -4,9 +4,9 @@
   <xacro:arg name="add_plug" default="false" />
   <xacro:arg name="use_mesh" default="true" />
   <xacro:arg name="camera_name" default="camera" />
-  <xacro:include filename="$(find franka_realsense_extrinsics)/urdf/_d435.urdf.xacro" />
+  <xacro:include filename="$(find franka_realsense_extrinsics)/urdf/_d405.urdf.xacro" />
 
-  <xacro:sensor_d435 use_nominal_extrinsics="$(arg use_nominal_extrinsics)" add_plug="$(arg add_plug)" use_mesh="$(arg use_mesh)" name="$(arg camera_name)">
+  <xacro:sensor_d405 use_nominal_extrinsics="$(arg use_nominal_extrinsics)" add_plug="$(arg add_plug)" name="$(arg camera_name)">
     <origin xyz="0 0 0" rpy="0 0 0"/>
-  </xacro:sensor_d435>
+  </xacro:sensor_d405>
 </robot>

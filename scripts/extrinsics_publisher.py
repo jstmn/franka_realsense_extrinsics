@@ -104,17 +104,23 @@ def _transformation_matrix_to_pose(transformation_matrix: np.ndarray) -> Pose:
 
 # panda_link0__T__${camera_name}_base_link
 EXTRINSICS_MATRICES = {
-    "south": np.array([
+    "camera_south": np.array([
         [-0.6379, -0.7203,  0.2726,  1.0278],
         [ 0.2826,  0.1104,  0.9529, -0.3099],
         [-0.7164,  0.6849,  0.1331,  0.7441],
         [ 0.0,     0.0,     0.0,     1.0]
     ]),
-    "north": np.array([
-        [-0.42493587,  0.88923595,  0.1693781,   0.91113114],
-        [-0.39242785, -0.01234728, -0.91969991,  0.47425413],
-        [-0.81573886, -0.45728216,  0.35420775,  0.79308677],
-        [ 0.0,         0.0,         0.0,         1.0]
+    "camera_north": np.array([
+        [-0.4504,  0.8766,  0.1694,  0.887],
+        [-0.3919, -0.0236, -0.9197,  0.4744],
+        [-0.8022, -0.4806,  0.3542,  0.805],
+        [ 0.0,     0.0,     0.0,     1.0]
+    ]),
+    "camera_eih": np.array([
+        [ 1.0,     0.0,     0.0,     0.5],
+        [ 0.0,     1.0,     0.0,     0.0],
+        [ 0.0,     0.0,     1.0,     0.5],
+        [ 0.0,     0.0,     0.0,     1.0]
     ]),
 }
 
@@ -141,13 +147,7 @@ class ExtrinsicsTfPublisher:
         assert self._camera_base__T__optical is not None
 
         # Set up interactive marker server
-        if "south" in self._camera_name:
-            tf_seed = EXTRINSICS_MATRICES["south"]
-        elif "north" in self._camera_name:
-            tf_seed = EXTRINSICS_MATRICES["north"]
-        else:
-            raise ValueError(f"Unknown camera name: {self._camera_name} (should include 'south' or 'north')")
-
+        tf_seed = EXTRINSICS_MATRICES[self._camera_name]
         self._last_world__T__base_link = _transformation_matrix_to_pose(tf_seed)
         self.server = InteractiveMarkerServer(f"{self._camera_name}__extrinsics_adjuster")
         marker = make_6dof_marker(self._robot_base_frame_id, self._camera_base_frame_id, self._last_world__T__base_link)
@@ -227,7 +227,7 @@ def main():
     args, unknown = parser.parse_known_args()
     print(f"Unknown arguments: {unknown}", flush=True)
     assert args.camera_tf_prefix is not None
-    assert "south" in args.camera_tf_prefix or "north" in args.camera_tf_prefix, f"Camera tf prefix must contain 'south' or 'north': {args.camera_tf_prefix}. Unknown arguments: {unknown}"
+    assert any(x in args.camera_tf_prefix for x in ["south", "north", "eih"]), f"Camera tf prefix must contain 'south' or 'north' or 'eih': {args.camera_tf_prefix}. Unknown arguments: {unknown}"
 
     # Initialize node (namespace is handled by launch file's <group ns="...">)
     rospy.init_node('camera_robot_tf_publisher', anonymous=False)
@@ -236,4 +236,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

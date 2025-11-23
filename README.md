@@ -8,13 +8,11 @@ Note that a control interface and demonstration logging utility is provided by t
 
 
 ## Setup
-
-1. FIRST: Install panda_utils (https://github.com/jstmn/panda_utils) to `~/Desktop`
-2. Create a ros workspace
-3. Download this repo to `~/ros/panda_ws/src/`
-4. Download and install `librealsense v2.50.0` and `realsense-ros v2.3.2` from this link: https://github.com/IntelRealSense/realsense-ros/releases/tag/2.3.2 Move `realsense-ros-2.3.2` to `~/ros/panda_ws/src/`
-5. (only if you have a D405 realsense) Next, you update `panda_ws/src/realsense-ros-2.3.2/src/realsense_node_factory.cpp` to support the D405. Specificially, look for `switch(pid)` on line 357. Simply add `case 0x0B5B:    // D405` into to switch case.
-6. `cd ~/ros/panda_ws/src/; catkin_make`
+2. Create a ros workspace at `~/ros/franka_ws/src/`
+3. Download this repo to `~/ros/franka_ws/src/`
+4. Download and install `librealsense v2.50.0` and `realsense-ros v2.3.2` from this link: https://github.com/IntelRealSense/realsense-ros/releases/tag/2.3.2. Move `realsense-ros-2.3.2` to `~/ros/franka_ws/src/`
+5. (only if you have a D405 realsense) Next, you update `franka_ws/src/realsense-ros-2.3.2/src/realsense_node_factory.cpp` to support the D405. Specificially, look for `switch(pid)` on line 357. Simply add `case 0x0B5B:    // D405` into to switch case.
+6. `cd ~/ros/franka_ws/src/; catkin_make`
 
 ## Example usage
 

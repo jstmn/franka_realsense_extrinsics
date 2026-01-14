@@ -20,7 +20,7 @@ Note that a control interface and demonstration logging utility is provided by t
 
 ``` bash
 # ONE TIME SETUP:
-echo "ROS_WS='/PATH/TO/panda_ros_ws'" >> ~/.bashrc; source ~/.bashrc
+echo "ROS_WS='/PATH/TO/ros/franka_ws'" >> ~/.bashrc; source ~/.bashrc # this is to franka_ws/, not ros/
 
 # Terminal 1:
 source /opt/ros/noetic/setup.bash; source ${ROS_WS}/devel/setup.bash

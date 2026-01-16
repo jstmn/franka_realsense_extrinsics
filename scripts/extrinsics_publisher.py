@@ -147,13 +147,17 @@ class ExtrinsicsTfPublisher:
         assert self._camera_base__T__optical is not None
 
         # Set up interactive marker server
-        tf_seed = EXTRINSICS_MATRICES[self._camera_name]
-        self._last_world__T__base_link = _transformation_matrix_to_pose(tf_seed)
+        tf_seed_matrix = EXTRINSICS_MATRICES[self._camera_name]
+        self._last_world__T__base_link = _transformation_matrix_to_pose(tf_seed_matrix)
         self.server = InteractiveMarkerServer(f"{self._camera_name}__extrinsics_adjuster")
         marker = make_6dof_marker(self._robot_base_frame_id, self._camera_base_frame_id, self._last_world__T__base_link)
         self.server.insert(marker, self.process_feedback)
         self.server.applyChanges()
 
+        # Printout the transforms
+        world__T__camera_optical = tf_seed_matrix @ self._camera_base__T__optical
+        print(self._camera_name, f"camera_base__T__{self._camera_name}_optical", self._camera_base__T__optical)
+        print(self._camera_name, f"world__T__{self._camera_name}_camera_optical", world__T__camera_optical)
 
 
     def get_camera_base__T__optical(self):

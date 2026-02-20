@@ -122,6 +122,12 @@ EXTRINSICS_MATRICES = {
         [ 0.0,     0.0,     1.0,     0.5],
         [ 0.0,     0.0,     0.0,     1.0]
     ]), # TODO: Update this in realtime to the current camera pose.
+    "camera_base": np.array([
+        [ 1.0,     0.0,     0.0,     -0.5],
+        [ 0.0,     1.0,     0.0,     0.0],
+        [ 0.0,     0.0,     1.0,     -0.5],
+        [ 0.0,     0.0,     0.0,     1.0]
+    ]),
 }
 
 
@@ -230,7 +236,7 @@ def main():
     parser.add_argument('--camera_tf_prefix', type=str, default='camera', help='Camera name (e.g., camera_south, camera_north)')
     args, unknown = parser.parse_known_args()
     assert args.camera_tf_prefix is not None
-    assert any(x in args.camera_tf_prefix for x in ["south", "north", "eih"]), f"Camera tf prefix must contain 'south' or 'north' or 'eih': {args.camera_tf_prefix}. Unknown arguments: {unknown}"
+    assert any(x in args.camera_tf_prefix for x in ["south", "north", "eih", "base"]), f"Camera tf prefix not recognized: {args.camera_tf_prefix}. Unknown arguments: {unknown}"
 
     # Initialize node (namespace is handled by launch file's <group ns="...">)
     rospy.init_node('camera_robot_tf_publisher', anonymous=False)

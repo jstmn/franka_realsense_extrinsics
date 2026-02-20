@@ -84,6 +84,45 @@
         <node name="extrinsics_publisher" pkg="franka_realsense_extrinsics" type="extrinsics_publisher.py" args="--camera_tf_prefix $(arg camera)" output="screen"/>
     </group>
 
+
+    <!-- RealSense base -->
+    <group ns="realsense_base">
+        <arg name="serial_no"             default="217222063197"/>
+        <arg name="json_file_path"        default=""/>
+        <arg name="camera"                default="camera_base"/>
+
+        <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
+        <arg name="serial_no"         value="$(arg serial_no)"/>
+        <arg name="json_file_path"    value="$(arg json_file_path)"/>
+        <arg name="depth_width"       value="$(arg depth_width)"/>
+        <arg name="depth_height"      value="$(arg depth_height)"/>
+        <arg name="depth_fps"         value="$(arg depth_fps)"/>
+        <arg name="color_width"       value="$(arg color_width)"/>
+        <arg name="color_height"      value="$(arg color_height)"/>
+        <arg name="color_fps"         value="$(arg color_fps)"/>
+        <arg name="enable_depth"      value="true"/>
+        <arg name="enable_color"      value="true"/>
+        <arg name="enable_infra1"     value="false"/>
+        <arg name="enable_infra2"     value="false"/>
+        <arg name="enable_fisheye"    value="false"/>
+        <arg name="enable_gyro"       value="false"/>
+        <arg name="enable_accel"      value="false"/>
+        <arg name="enable_pointcloud" value="true"/>
+        <arg name="enable_sync"       value="true"/>
+        <arg name="tf_prefix"         value="$(arg camera)"/>
+        <arg name="clip_distance"     value="$(arg clip_distance)"/>
+        <arg name="filters" value="$(arg filters)"/>
+        <!-- For some reason, the north camera need a hardware reset before every launch -->
+        <arg name="initial_reset" value="true"/>
+        </include>
+
+        <!-- RealSense robot description -->
+        <param name="robot_description" command="$(find xacro)/xacro '$(find franka_realsense_extrinsics)/urdf/d435.urdf.xacro' use_nominal_extrinsics:=true camera_name:=$(arg camera)"/>
+        <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+        <node name="extrinsics_publisher" pkg="franka_realsense_extrinsics" type="extrinsics_publisher.py" args="--camera_tf_prefix $(arg camera)" output="screen"/>
+    </group>
+
+
     <!-- RealSense EyeInHand -->
     <group ns="realsense_eih">
         <arg name="serial_no"             default="130322270512"/>
